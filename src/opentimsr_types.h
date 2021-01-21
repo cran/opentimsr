@@ -23,14 +23,19 @@
 #include <vector>
 #include <unordered_map>
 
+#include "platform.h"
+
+#ifndef OPENTIMS_BUILDING_R
 #include "sqlite/sqlite3.h"
+#endif
+
 #include "zstd/zstd.h"
 
-#include "platform.h"
 
 #ifdef OPENTIMS_BUILDING_R
 #define STRICT_R_HEADERS
 #include "mio.h"
+#include <Rcpp.h>
 #else
 #include "mio.hpp"
 #endif
@@ -43,16 +48,6 @@ int tims_sql_callback(void* out, int cols, char** row, char** colnames);
 
 class TimsFrame
 {
-    TimsFrame(uint32_t _id,
-              uint32_t _num_scans,
-              uint32_t _num_peaks,
-              uint32_t _msms_type,
-              double _intensity_correction,
-              double _time,
-              const char* frame_ptr,
-              TimsDataHandle& parent_hndl
-            );
-
     std::unique_ptr<char[]> back_buffer;
 
     char* bytes0;
@@ -98,6 +93,16 @@ class TimsFrame
     */
 
 public:
+    TimsFrame(uint32_t _id,
+              uint32_t _num_scans,
+              uint32_t _num_peaks,
+              uint32_t _msms_type,
+              double _intensity_correction,
+              double _time,
+              const char* frame_ptr,
+              TimsDataHandle& parent_hndl
+            );
+
     static TimsFrame TimsFrameFromSql(char** sql_row, 
                                       TimsDataHandle& parent_handle);
 
@@ -167,10 +172,14 @@ private:
 
     ZSTD_DCtx* zstd_dctx;
 
+#ifndef OPENTIMS_BUILDING_R
     sqlite3* db_conn;
+#endif
 
     std::unique_ptr<Tof2MzConverter> tof2mz_converter;
     std::unique_ptr<Scan2InvIonMobilityConverter> scan2inv_ion_mobility_converter;
+
+    void init();
 
 public:
     TimsDataHandle(const std::string& tims_tdf_bin_path,
@@ -178,6 +187,11 @@ public:
                    const std::string& tims_data_dir);
 
     TimsDataHandle(const std::string& tims_data_dir);
+
+#ifdef OPENTIMS_BUILDING_R
+    TimsDataHandle(const std::string& tims_data_dir, const Rcpp::List& analysis_tdf);
+    void* setupFromAnalysisList(const Rcpp::List& analysis_tdf);
+#endif /* OPENTIMS_BUILDING_R */
 
     ~TimsDataHandle();
 
@@ -275,7 +289,7 @@ public:
 
     const std::unique_ptr<uint32_t[]>& intensities_buffer() { return _intensities_buffer; };
 
-    const sqlite3* db_connection() { return db_conn; };
+//    const sqlite3* db_connection() { return db_conn; };
 
     friend int tims_sql_callback(void* out, int cols, char** row, char** colnames);
 
