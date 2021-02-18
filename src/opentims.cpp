@@ -227,15 +227,6 @@ void TimsFrame::save_to_buffs(uint32_t* frame_ids,
         close();
 }
 
-
-void Peak::print()
-{
-#ifndef OPENTIMS_BUILDING_R
-    std::cout << frame_id << "  " << scan_id << "   " << tof << "    " << intensity << std::endl;
-#endif
-}
-
-
 int tims_sql_callback(void* out, int cols, char** row, char**)
 {
     assert(cols == 7);
@@ -305,18 +296,59 @@ TimsDataHandle::TimsDataHandle(const std::string& tims_data_dir)
 {}
 
 #ifdef OPENTIMS_BUILDING_R
+
+union braindead_r
+{
+    double as_dbl;
+    int64_t as_int;
+};
+
+template<typename T> std::vector<T> braindead_r_extract_as_int(const SEXP& vec)
+{
+    /* Quick and dirty workaround for R being braindead.
+     * R holds integers as either IntegerVector or as NumericVector depending on size.
+     * Converting a NumericVector to IntegerVector fails silently, giving zeros.
+     * This function forces it to a sensible C++ int type.
+     */
+
+    std::vector<T> res;
+
+    if(Rf_isInteger(vec))
+    {
+        Rcpp::IntegerVector vint(vec);
+        res.reserve(vint.size());
+        for(int ii=0; ii<vint.size(); ii++)
+            res.push_back(vint[ii]);
+        return res;
+    }
+    else
+    {
+        braindead_r converter;
+        Rcpp::NumericVector vnum(vec);
+        res.reserve(vnum.size());
+        for(int ii=0; ii<vnum.size(); ii++)
+        {
+            converter.as_dbl = vnum[ii];
+            res.push_back(converter.as_int);
+        }
+        return res;
+    }
+}
+
 TimsDataHandle::TimsDataHandle(const std::string& tims_data_dir, const Rcpp::List& analysis_tdf) :
 TimsDataHandle(tims_data_dir)
 {
-    Rcpp::IntegerVector ids = analysis_tdf("Id");
-    Rcpp::IntegerVector num_scans = analysis_tdf("NumScans");
-    Rcpp::IntegerVector num_peaks = analysis_tdf("NumPeaks");
-    Rcpp::IntegerVector msms_type = analysis_tdf("MsMsType");
+
+    std::vector<uint32_t> ids = braindead_r_extract_as_int<uint32_t>(analysis_tdf("Id"));
+    std::vector<uint32_t> num_scans = braindead_r_extract_as_int<uint32_t>(analysis_tdf("NumScans"));
+    std::vector<uint32_t> num_peaks = braindead_r_extract_as_int<uint32_t>(analysis_tdf("NumPeaks"));
+    std::vector<uint32_t> msms_type = braindead_r_extract_as_int<uint32_t>(analysis_tdf("MsMsType"));
     Rcpp::NumericVector accum_time = analysis_tdf("AccumulationTime");
     Rcpp::NumericVector time = analysis_tdf("Time");
-    Rcpp::IntegerVector tims_id = analysis_tdf("TimsId");
+    std::vector<uint64_t> tims_id = braindead_r_extract_as_int<uint64_t>(analysis_tdf("TimsId"));
 
     for(size_t ii = 0; ii < ids.size(); ii++)
+    {
         frame_descs.emplace(ids[ii], TimsFrame(
                 ids[ii],
                 num_scans[ii],
@@ -326,6 +358,7 @@ TimsDataHandle(tims_data_dir)
                 time[ii],
                 tims_id[ii] + tims_data_bin.data(),
                 *this));
+    }
 
     init();
 }
@@ -348,7 +381,7 @@ TimsFrame& TimsDataHandle::get_frame(uint32_t frame_no)
     return frame_descs.at(frame_no); 
 }
 
-std::unordered_map<uint32_t, TimsFrame>& TimsDataHandle::get_frame_descs()
+const std::unordered_map<uint32_t, TimsFrame>& TimsDataHandle::get_frame_descs()
 {
     return frame_descs;
 }
