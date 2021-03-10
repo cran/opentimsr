@@ -1,6 +1,6 @@
 /*
  *   OpenTIMS: a fully open-source library for opening Bruker's TimsTOF data files.
- *   Copyright (C) 2020 Michał Startek and Mateusz Łącki
+ *   Copyright (C) 2020-2021 Michał Startek and Mateusz Łącki
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License, version 3 only,
@@ -14,6 +14,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 #pragma once
 #include <cstdlib>
 #include <cstdint>
@@ -406,6 +407,13 @@ public:
     const std::unique_ptr<uint32_t[]>& intensities_buffer() { return _intensities_buffer; };
 
 //    const sqlite3* db_connection() { return db_conn; };
+
+    //! Obtain the Total Ionic Current for each frame present in the spectrum
+    /** The data is saved to the argument buffer - which must be able to hold at least
+     * max_frame_id()-1 values. The number at nth index corresponds to n+1st frame (as
+     * frames are numbered starting at 1).
+     */
+    void per_frame_TIC(uint32_t* result);
 
     friend int tims_sql_callback(void* out, int cols, char** row, char** colnames);
 
