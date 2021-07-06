@@ -22,7 +22,9 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+#include <locale>
 #include <memory>
+#include <limits>
 #include <unordered_map>
 
 
@@ -198,7 +200,7 @@ void TimsFrame::save_to_buffs(uint32_t* frame_ids,
 
     if(scan_ids != nullptr)
         for(uint32_t ii = peaks_processed; ii < nnum_peaks; ii++)
-            scan_ids[peaks_processed] = num_scans_m1;
+            scan_ids[ii] = num_scans_m1;
 
     while(peaks_processed < nnum_peaks)
     {
@@ -247,8 +249,13 @@ int tims_sql_callback(void* out, int cols, char** row, char**)
 void TimsDataHandle::read_sql(const std::string& tims_tdf_path)
 {
 #ifndef OPENTIMS_BUILDING_R
+    std::locale previous_locale = std::locale::global(std::locale("C"));
+
     if(sqlite3_open_v2(tims_tdf_path.c_str(), &db_conn, SQLITE_OPEN_READONLY, NULL))
+    {
+        std::locale::global(previous_locale);
         throw std::runtime_error(std::string("ERROR opening database: " + tims_tdf_path + " SQLite error msg: ") + sqlite3_errmsg(db_conn));
+    }
 
     const char sql[] = "SELECT Id, NumScans, NumPeaks, MsMsType, AccumulationTime, Time, TimsId from Frames;";
 
@@ -259,8 +266,11 @@ void TimsDataHandle::read_sql(const std::string& tims_tdf_path)
         std::string err_msg(std::string("ERROR performing SQL query. SQLite error msg: ") + error);
         sqlite3_free(error);
         sqlite3_close(db_conn);
+        std::locale::global(previous_locale);
         throw std::runtime_error(err_msg);
     }
+
+    std::locale::global(previous_locale);
 #endif
 }
 
@@ -386,7 +396,7 @@ TimsFrame& TimsDataHandle::get_frame(uint32_t frame_no)
     return frame_descs.at(frame_no); 
 }
 
-const std::unordered_map<uint32_t, TimsFrame>& TimsDataHandle::get_frame_descs()
+std::unordered_map<uint32_t, TimsFrame>& TimsDataHandle::get_frame_descs()
 {
     return frame_descs;
 }

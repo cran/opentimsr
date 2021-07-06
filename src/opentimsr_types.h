@@ -211,9 +211,11 @@ private:
     sqlite3* db_conn;
 #endif
 
+public:
     std::unique_ptr<Tof2MzConverter> tof2mz_converter;
     std::unique_ptr<Scan2InvIonMobilityConverter> scan2inv_ion_mobility_converter;
 
+private:
     void init();
 
 #ifdef OPENTIMS_BUILDING_R
@@ -251,7 +253,7 @@ public:
     TimsFrame& get_frame(uint32_t frame_no);
 
     //! Access a dictionary containing all the frames from this dataset, keyed by ID.
-    const std::unordered_map<uint32_t, TimsFrame>& get_frame_descs();
+    std::unordered_map<uint32_t, TimsFrame>& get_frame_descs();
 
     //! Returns the total number of MS peaks in this handle.
     size_t no_peaks_total() const;

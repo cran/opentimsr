@@ -1,4 +1,4 @@
-addf691953dd352428fa1b61d99270fb *DESCRIPTION
+1c8018d2c78877de737bc709de7d386a *DESCRIPTION
 c7783522a456fcc05ceaec1b31a73d54 *NAMESPACE
 1ca4df6294971636f685580a946aea63 *R/RcppExports.R
 49335b9bf19f2337aab16a0092dcecbe *R/opentimsr.R
@@ -24,15 +24,15 @@ c9b1d925ee1d6852a68a3ba8e73ea26e *man/table2df.Rd
 3d490f63732edc5e8a5c1c0622296827 *src/Rinterface.cpp
 a99b478dfe93b237ac380e83f3d1dfaf *src/bruker.h
 7df183d414255115a83eea34af3e68bc *src/mio.h
-5ca30659a207d22ce87d8a75d3058502 *src/opentims.cpp
-b17334546c777e95e97f54ff76d5888a *src/opentimsr_types.h
+84e330b712c007fb53913a03cbd288ef *src/opentims.cpp
+24a177d3c61e5d754c9580e26eb16837 *src/opentimsr_types.h
 e304be0c781d73eb9c66a8d510d909a6 *src/platform.h
 0c3841f755206b18cc9e883126b29fde *src/platform_os.h
 1d68560d7aaace215ba46aafbe9abc6f *src/scan2inv_ion_mobility_converter.cpp
-86d5c44810479e0c8e8b7d1efef378f4 *src/scan2inv_ion_mobility_converter.h
-bfdd1025ff23d731167a64111ed157b2 *src/so_manager.h
+b98a4267d1b5ef296b84ae9fcf659aca *src/scan2inv_ion_mobility_converter.h
+03f3400c3196e0312d437a4fab6509ae *src/so_manager.h
 3df4c7a55d8144c599988db64bf1445b *src/tof2mz_converter.cpp
-576e9bab0f045d8ec0674e9495bc336c *src/tof2mz_converter.h
+3726a916638b45a2a6be41d65a19638e *src/tof2mz_converter.h
 38162db813f2253448e9f3b03f43f36a *src/zstd/zstd.h
 5760a6502752e6b36706663c0baac756 *src/zstd/zstddeclib.c
 2c562d0a9556bcb79436f516741b9bdf *src/zstddec_cpl.c
