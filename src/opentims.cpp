@@ -20,11 +20,13 @@
 #include <cstdint>
 #include <string>
 #include <cstring>
+#include <atomic>
 #include <vector>
 #include <iostream>
 #include <locale>
 #include <memory>
 #include <limits>
+#include <thread>
 #include <unordered_map>
 
 
@@ -40,6 +42,7 @@
 
 #include "tof2mz_converter.h"
 #include "scan2inv_ion_mobility_converter.h"
+#include "thread_mgr.h"
 
 TimsFrame::TimsFrame(uint32_t _id,
                      uint32_t _num_scans,
@@ -111,7 +114,14 @@ void TimsFrame::decompress(char* decompression_buffer, ZSTD_DCtx* decomp_ctx)
     if(decomp_ctx == nullptr)
         decomp_ctx = parent_tdh.zstd_dctx;
 
-    ZSTD_decompressDCtx(decomp_ctx, decompression_buffer, dsbytes, tims_bin_frame + 8, tims_packet_size - 8);
+    size_t dec_result = ZSTD_decompressDCtx(decomp_ctx, decompression_buffer, dsbytes, tims_bin_frame + 8, tims_packet_size - 8);
+    if(ZSTD_isError(dec_result))
+    {
+        std::string err = "Error uncompressing frame, error code: ";
+        err += std::to_string(dec_result);
+        err += ". File is either corrupted, or in a (yet) unsupported variant of the format.";
+        throw std::runtime_error(err);
+    }
 
     size_t dsints = data_size_ints();
     bytes0 = decompression_buffer;
@@ -245,32 +255,75 @@ int tims_sql_callback(void* out, int cols, char** row, char**)
     return 0;
 }
 
+int check_compression(void*, int cols, char** row, char**)
+{
+    assert(cols == 1);
+    assert(row != NULL);
+    assert(row[0] != NULL);
+    if(atoi(row[0]) != 2)
+    {
+        std::string error_msg = "Compression algorithm used in your TDF dataset: ";
+        error_msg += row[0];
+        error_msg += " is not (yet) supported by OpenTIMS. Right now only algorithm 2 (zstd) is supported.";
+        throw std::runtime_error(error_msg);
+    }
+    return 0;
+}
+
+#ifndef OPENTIMS_BUILDING_R
+namespace{
+class RAIILocaleHelper
+{
+    const std::locale previous_locale;
+ public:
+    RAIILocaleHelper() : previous_locale(std::locale::global(std::locale("C"))) {};
+    ~RAIILocaleHelper() { std::locale::global(previous_locale); };
+};
+
+class RAIISqlite
+{
+    sqlite3* db_conn;
+ public:
+    RAIISqlite(const std::string& tims_tdf_path) : db_conn(nullptr)
+    {
+        if(sqlite3_open_v2(tims_tdf_path.c_str(), &db_conn, SQLITE_OPEN_READONLY, NULL))
+            throw std::runtime_error(std::string("ERROR opening database: " + tims_tdf_path + " SQLite error msg: ") + sqlite3_errmsg(db_conn));
+    }
+    ~RAIISqlite()
+    {
+        if(db_conn != nullptr)
+            sqlite3_close(db_conn);
+    }
+    sqlite3* release_connection() { sqlite3* ret = db_conn; db_conn = nullptr; return ret; }
+    void query(const std::string& sql, int (*callback)(void*,int,char**,char**), void* arg)
+    {
+        char* error = NULL;
+
+        if(sqlite3_exec(db_conn, sql.c_str(), callback, arg, &error) != SQLITE_OK)
+        {
+	    std::string err_msg(std::string("ERROR performing SQL query. SQLite error msg: ") + error);
+	    sqlite3_free(error);
+	    throw std::runtime_error(err_msg);
+        }
+    }
+
+};
+}
+#endif
 
 void TimsDataHandle::read_sql(const std::string& tims_tdf_path)
 {
 #ifndef OPENTIMS_BUILDING_R
-    std::locale previous_locale = std::locale::global(std::locale("C"));
+    RAIILocaleHelper locale_guard;
+    RAIISqlite DB(tims_tdf_path);
 
-    if(sqlite3_open_v2(tims_tdf_path.c_str(), &db_conn, SQLITE_OPEN_READONLY, NULL))
-    {
-        std::locale::global(previous_locale);
-        throw std::runtime_error(std::string("ERROR opening database: " + tims_tdf_path + " SQLite error msg: ") + sqlite3_errmsg(db_conn));
-    }
+    const std::string sql = "SELECT Id, NumScans, NumPeaks, MsMsType, AccumulationTime, Time, TimsId from Frames;";
 
-    const char sql[] = "SELECT Id, NumScans, NumPeaks, MsMsType, AccumulationTime, Time, TimsId from Frames;";
+    DB.query(sql, tims_sql_callback, this);
+    DB.query("SELECT Value FROM GlobalMetadata WHERE Key == \"TimsCompressionType\";", check_compression, nullptr);
 
-    char* error = NULL;
+    db_conn = DB.release_connection();
 
-    if(sqlite3_exec(db_conn, sql, tims_sql_callback, this, &error) != SQLITE_OK)
-    {
-        std::string err_msg(std::string("ERROR performing SQL query. SQLite error msg: ") + error);
-        sqlite3_free(error);
-        sqlite3_close(db_conn);
-        std::locale::global(previous_locale);
-        throw std::runtime_error(err_msg);
-    }
-
-    std::locale::global(previous_locale);
 #endif
 }
 
@@ -279,7 +332,7 @@ void TimsDataHandle::init()
 {
     _min_frame_id = (std::numeric_limits<uint32_t>::max)();
     _max_frame_id = (std::numeric_limits<uint32_t>::min)();
-    size_t decomp_buffer_size = 0;
+    decomp_buffer_size = 0;
     for(auto it = frame_descs.begin(); it != frame_descs.end(); it++)
     {
         _min_frame_id = (std::min)(_min_frame_id, it->first);
@@ -574,6 +627,44 @@ size_t TimsDataHandle::expose_frame(size_t frame_no)
     frame.save_to_buffs(nullptr, _scan_ids_buffer.get(), _tofs_buffer.get(), _intensities_buffer.get(), nullptr, nullptr, nullptr, zstd_dctx);
     return frame.num_peaks;
 }
+
+void TimsDataHandle::extract_frames(const std::vector<uint32_t>& indexes,
+                                    uint32_t* const * frame_ids,
+                                    uint32_t* const * scan_ids,
+                                    uint32_t* const * tofs,
+                                    uint32_t* const * intensities,
+                                    double* const * mzs,
+                                    double* const * inv_ion_mobilities,
+                                    double* const * retention_times)
+{
+    std::atomic<size_t> current_task(0);
+
+    ThreadingManager::get_instance().set_shared_threading();
+    size_t n_threads = ThreadingManager::get_instance().get_no_opentims_threads();
+
+    std::vector<std::thread> threads;
+    for(size_t ii=0; ii<n_threads; ii++)
+        threads.emplace_back([&](){
+            std::unique_ptr<ZSTD_DCtx, decltype(&ZSTD_freeDCtx)> zstd(ZSTD_createDCtx(), &ZSTD_freeDCtx);
+            std::unique_ptr<char[]> decomp_buffer = std::make_unique<char[]>(decomp_buffer_size);
+            while(true)
+            {
+                size_t my_task = current_task.fetch_add(1);
+                if(my_task < indexes.size())
+                {
+                    TimsFrame& frame = get_frame(indexes[my_task]);
+                    frame.decompress(decomp_buffer.get(), zstd.get());
+                    frame.save_to_buffs(frame_ids[my_task], scan_ids[my_task], tofs[my_task], intensities[my_task], mzs[my_task], inv_ion_mobilities[my_task], retention_times[my_task]);
+                    frame.close();
+                }
+                else
+                    break;
+            }
+        });
+    for (auto& th : threads) th.join();
+    ThreadingManager::get_instance().set_converter_threading();
+}
+
 
 void TimsDataHandle::per_frame_TIC(uint32_t* result)
 {

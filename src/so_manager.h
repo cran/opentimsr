@@ -26,28 +26,17 @@
 
 #if defined(OPENTIMS_UNIX)
 
-#include "dlfcn.h"
+#include <dlfcn.h>
 
 class LoadedLibraryHandle
 // RAII-style wrapper for results of dlopen()
 {
     void* os_handle;
  public:
-    LoadedLibraryHandle(const std::string& path) : os_handle(nullptr)
-    {
-        os_handle = dlopen(path.c_str(), RTLD_NOW);
-        if(os_handle == nullptr)
-            throw std::runtime_error(std::string("dlopen(") + path + ") failed, reason: " + dlerror());
-    }
+    LoadedLibraryHandle(const std::string& path);
+    ~LoadedLibraryHandle();
 
-    ~LoadedLibraryHandle()
-    {
-        if(os_handle != nullptr)
-            dlclose(os_handle);
-        // Deliberately not handling errors in dlclose() call here.
-    }
-
-    template<typename T> T* symbol_lookup(const std::string& symbol_name)
+    template<typename T> T* symbol_lookup(const std::string& symbol_name) const
     {
         dlerror(); // Clear dllerror
         void* ret = dlsym(os_handle, symbol_name.c_str()); // nullptr might be a valid result here, got to check dlerror...
@@ -70,20 +59,10 @@ class LoadedLibraryHandle
 {
     HMODULE os_handle;
  public:
-    LoadedLibraryHandle(const std::string& path) : os_handle(nullptr)
-    {
-        os_handle = LoadLibraryA(path.c_str());
-        if(os_handle == nullptr)
-            throw std::runtime_error(std::string("LoadLibraryA(") + path + ") failed, reason: " + std::to_string(GetLastError()));
-    }
+    LoadedLibraryHandle(const std::string& path);
+    ~LoadedLibraryHandle();
 
-    ~LoadedLibraryHandle()
-    {
-        if(os_handle != nullptr)
-            FreeLibrary(os_handle);
-    }
-
-    template<typename T> T* symbol_lookup(const std::string& symbol_name)
+    template<typename T> T* symbol_lookup(const std::string& symbol_name) const
     {
         FARPROC ret = GetProcAddress(os_handle, symbol_name.c_str()); // nullptr might be a valid result here, got to check dlerror...
         if(ret == nullptr)
@@ -94,8 +73,6 @@ class LoadedLibraryHandle
 
 
 
-
-
 #else
 // provide empty stubs
 
@@ -103,11 +80,10 @@ class LoadedLibraryHandle
 // RAII-style wrapper for results of dlopen()
 {
  public:
-    LoadedLibraryHandle(const std::string&) {}
+    LoadedLibraryHandle(const std::string&);
+    ~LoadedLibraryHandle();
 
-    ~LoadedLibraryHandle() {}
-
-    template<typename T> T* symbol_lookup(const std::string& symbol_name)
+    template<typename T> T* symbol_lookup(const std::string& symbol_name) const
     {
         throw std::runtime_error(std::string("Loading additional libraries is not supported on your platform"));
     }

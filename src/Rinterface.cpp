@@ -22,15 +22,13 @@
 #include "opentimsr_types.h"
 
 // adding default converters.
-#include "scan2inv_ion_mobility_converter.h"
-#include "tof2mz_converter.h"
+#include "converters.h"
 
 
 // [[Rcpp::export(.setup_bruker_so)]]
 void setup_bruker_so(const Rcpp::String& path)
 {
-    DefaultTof2MzConverterFactory::setAsDefault<BrukerTof2MzConverterFactory, const char*>(path.get_cstring());
-    DefaultScan2InvIonMobilityConverterFactory::setAsDefault<BrukerScan2InvIonMobilityConverterFactory, const char*>(path.get_cstring());
+    setup_bruker(std::string(path.get_cstring()));
 }
 
 
@@ -42,6 +40,12 @@ Rcpp::XPtr<TimsDataHandle> tdf_open(const Rcpp::String& path_d, const Rcpp::List
     return Rcpp::XPtr<TimsDataHandle>(p, true);
 }
 
+
+// [[Rcpp::export]]
+void tdf_close(Rcpp::XPtr<TimsDataHandle> tdf)
+{
+    tdf.release();
+}
 
 
 // [[Rcpp::export]]
@@ -64,25 +68,6 @@ size_t tdf_no_peaks_total(Rcpp::XPtr<TimsDataHandle> tdf)
     return tdf->no_peaks_total();
 }
 
-
-// [[Rcpp::export]]
-Rcpp::IntegerVector tdf_get_msms_type(Rcpp::XPtr<TimsDataHandle> tdf)
-{
-    using namespace Rcpp;
-    size_t start = tdf->min_frame_id();
-    size_t end = tdf->min_frame_id();
-    int n = end - start;
-
-    TimsDataHandle& tdh = *tdf;
-    IntegerVector msms_types(n);
-
-    for(size_t idx = start; idx < end; idx += 1)
-    {
-
-    }
-
-    return msms_types;
-} 
 
 // [[Rcpp::export]]
 Rcpp::DataFrame tdf_get_range(Rcpp::XPtr<TimsDataHandle> tdf, size_t start, size_t end, int32_t step = 1)
