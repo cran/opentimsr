@@ -38,6 +38,11 @@ void ErrorTof2MzConverter::convert(uint32_t, double*, const uint32_t*, uint32_t)
     throw std::logic_error("Default conversion method must be selected BEFORE opening any TimsDataHandles - or it must be passed explicitly to the constructor");
 }
 
+void ErrorTof2MzConverter::inverse_convert(uint32_t, uint32_t*, const double*, uint32_t)
+{
+    throw std::logic_error("Default conversion method must be selected BEFORE opening any TimsDataHandles - or it must be passed explicitly to the constructor");
+}
+
 std::string ErrorTof2MzConverter::description() { return "ErrorTof2MzConverter default"; }
 
 /*
@@ -59,6 +64,7 @@ BrukerTof2MzConverter::BrukerTof2MzConverter(TimsDataHandle& TDH, const std::str
     tims_get_last_error_string = lib_handle.symbol_lookup<tims_get_last_error_string_fun_t>("tims_get_last_error_string");
     tims_close = lib_handle.symbol_lookup<tims_close_fun_t>("tims_close");
     tims_index_to_mz = lib_handle.symbol_lookup<tims_convert_fun_t>("tims_index_to_mz");
+    tims_mz_to_index = lib_handle.symbol_lookup<tims_convert_fun_t>("tims_mz_to_index");
 
     bruker_file_handle = (*tims_open)(TDH.tims_dir_path.c_str(), 0); // Recalibrated states not supported
 
@@ -82,6 +88,14 @@ void BrukerTof2MzConverter::convert(uint32_t frame_id, double* mzs, const uint32
     for(uint32_t idx = 0; idx < size; idx++)
         dbl_tofs[idx] = static_cast<double>(tofs[idx]);
     tims_index_to_mz(bruker_file_handle, frame_id, dbl_tofs.get(), mzs, size);
+}
+
+void BrukerTof2MzConverter::inverse_convert(uint32_t frame_id, uint32_t* tofs, const double* mzs, uint32_t size)
+{
+    std::unique_ptr<double[]> dbl_tofs = std::make_unique<double[]>(size);
+    tims_mz_to_index(bruker_file_handle, frame_id, mzs, dbl_tofs.get(), size);
+    for(uint32_t idx = 0; idx < size; idx++)
+        tofs[idx] = static_cast<uint32_t>(dbl_tofs[idx]);
 }
 
 std::string BrukerTof2MzConverter::description()

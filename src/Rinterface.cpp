@@ -23,6 +23,7 @@
 
 // adding default converters.
 #include "converters.h"
+#include "thread_mgr.h"
 
 
 // [[Rcpp::export(.setup_bruker_so)]]
@@ -190,7 +191,7 @@ Rcpp::DataFrame tdf_extract_frames(
 
     std::unique_ptr<uint32_t[]> v = std::make_unique<uint32_t[]>(indexes.size());
 
-    for(size_t ii=0; ii < indexes.size(); ++ii) v[ii] = indexes[ii];
+    for(R_xlen_t ii=0; ii < indexes.size(); ++ii) v[ii] = indexes[ii];
 
     const size_t peaks_no = tdh.no_peaks_in_frames(v.get(), indexes.size()); // conts for compiler optimization.
 
@@ -284,4 +285,10 @@ Rcpp::DataFrame tdf_extract_frames_slice(
     set_frame<double, Rcpp::NumericVector>(result, "retention_time", retention_times, peaks_no);
 
     return result;
+}
+
+// [[Rcpp::export]]
+void tdf_set_num_threads(const size_t n)
+{
+    ThreadingManager::get_instance().set_num_threads(n);
 }

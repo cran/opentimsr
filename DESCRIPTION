@@ -2,8 +2,8 @@ Encoding: UTF-8
 Package: opentimsr
 Type: Package
 Title: An Open-Source Loader for Bruker's timsTOF Data Files
-Version: 1.0.11
-Date: 2021-12-10
+Version: 1.0.12
+Date: 2022-03-08
 Authors@R: 
     c(person(given="Michał Piotr",
              family="Startek",
@@ -28,12 +28,12 @@ Imports: Rcpp (>= 0.12.0), methods, DBI, RSQLite
 LazyData: no
 LinkingTo: Rcpp
 NeedsCompilation: yes
-SystemRequirements: C++14
+SystemRequirements: C++17
 RoxygenNote: 7.1.2
-Packaged: 2021-12-18 08:53:46 UTC; mist
+Packaged: 2022-03-08 11:32:02 UTC; mist
 Author: Michał Piotr Startek [aut, cre, cph]
     (<https://orcid.org/0000-0001-5227-3447>),
   Mateusz Krzysztof Łącki [aut, cph]
     (<https://orcid.org/0000-0001-7415-4748>)
 Repository: CRAN
-Date/Publication: 2021-12-18 11:10:02 UTC
+Date/Publication: 2022-03-08 13:20:06 UTC
