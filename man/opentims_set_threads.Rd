@@ -13,7 +13,7 @@ opentims_set_threads(n)
 void
 }
 \description{
-A value of 0 s acceptable: it will cause OpenTIMS to use all detected cores.
+A value of 0 is acceptable: it will cause OpenTIMS to use all detected cores.
 }
 \examples{
 \dontrun{
